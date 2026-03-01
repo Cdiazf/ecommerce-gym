@@ -115,12 +115,19 @@ npm run build:frontend
 npm test
 npm run test:e2e
 npm run test:flow
+npm run test:staging:smoke
 npm run db:migrate
 npm run db:migrate:compose
 npm run db:backup
 npm run db:backup:compose
 npm run db:restore:compose -- <db_name> <backup_file.sql.gz>
 npm run ops:check:env
+```
+
+For a quick pre-promotion smoke test against the deployed staging-like stack:
+
+```bash
+ADMIN_PASS='<admin-password>' USER_PASS='<user-password>' npm run test:staging:smoke
 ```
 
 ## Health and Metrics

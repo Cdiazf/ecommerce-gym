@@ -151,6 +151,12 @@ Also validate compose-based migrations locally when testing deployment flow:
 npm run db:migrate:compose -- .env.production docker-compose.production.yml
 ```
 
+Before promoting `staging` to `main`, run the smoke test against the deployed stack:
+
+```bash
+ADMIN_PASS='<admin-password>' USER_PASS='<user-password>' npm run test:staging:smoke
+```
+
 Test backup and restore flow locally:
 
 ```bash
