@@ -116,6 +116,7 @@ npm test
 npm run test:e2e
 npm run test:flow
 npm run db:migrate
+npm run db:migrate:compose
 npm run db:backup
 npm run ops:check:env
 ```
@@ -223,9 +224,30 @@ Deployment strategy:
 The deploy workflow runs over SSH and executes:
 
 ```bash
+git fetch origin && git checkout <target-branch> && git pull --ff-only origin <target-branch>
+bash scripts/db/run-compose-migrations.sh .env.<target> docker-compose.production.yml
 docker compose --env-file .env.<target> -f docker-compose.production.yml pull
 docker compose --env-file .env.<target> -f docker-compose.production.yml up -d --no-build
 ```
+
+## Auth Hardening
+
+Authentication now includes:
+
+- IP-based rate limiting on `POST /auth/login`
+- IP-based rate limiting on `POST /auth/register`
+- production startup validation for:
+  - `AUTH_TOKEN_SECRET`
+  - `ADMIN_PASSWORD`
+
+Configurable env vars:
+
+- `AUTH_LOGIN_MAX_ATTEMPTS`
+- `AUTH_LOGIN_WINDOW_SECONDS`
+- `AUTH_LOGIN_BLOCK_SECONDS`
+- `AUTH_REGISTER_MAX_ATTEMPTS`
+- `AUTH_REGISTER_WINDOW_SECONDS`
+- `AUTH_REGISTER_BLOCK_SECONDS`
 
 GitHub-side setup still required:
 
