@@ -1,0 +1,55 @@
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Backup target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  backup-staging:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backup staging database over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.STAGING_DEPLOY_PATH }}
+            git fetch origin
+            git checkout staging
+            git pull --ff-only origin staging
+            bash scripts/db/backup-postgres-compose.sh .env.staging docker-compose.production.yml
+
+  backup-production:
+    if: (github.event_name == 'schedule' && vars.ENABLE_AUTOMATED_PRODUCTION_BACKUPS == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backup production database over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_SSH_HOST }}
+          username: ${{ secrets.PRODUCTION_SSH_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
+            bash scripts/db/backup-postgres-compose.sh .env.production docker-compose.production.yml

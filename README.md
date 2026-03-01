@@ -118,6 +118,8 @@ npm run test:flow
 npm run db:migrate
 npm run db:migrate:compose
 npm run db:backup
+npm run db:backup:compose
+npm run db:restore:compose -- <db_name> <backup_file.sql.gz>
 npm run ops:check:env
 ```
 
@@ -213,6 +215,7 @@ The repo includes:
 
 - `.env.staging.example`
 - `.github/workflows/deploy.yml`
+- `.github/workflows/database-backup.yml`
 - `.github/CODEOWNERS`
 - `docs/github-operations.md`
 
@@ -228,6 +231,30 @@ git fetch origin && git checkout <target-branch> && git pull --ff-only origin <t
 bash scripts/db/run-compose-migrations.sh .env.<target> docker-compose.production.yml
 docker compose --env-file .env.<target> -f docker-compose.production.yml pull
 docker compose --env-file .env.<target> -f docker-compose.production.yml up -d --no-build
+```
+
+## Automated Backups
+
+The repo now includes compose-based backup and restore scripts:
+
+- `scripts/db/backup-postgres-compose.sh`
+- `scripts/db/restore-postgres-compose.sh`
+
+And an automated GitHub Actions workflow:
+
+- `.github/workflows/database-backup.yml`
+
+Behavior:
+
+- `staging`: nightly backup at `03:15 UTC`
+- `production`: manual backup by default
+- `production` scheduled backups can be enabled with repository variable:
+  - `ENABLE_AUTOMATED_PRODUCTION_BACKUPS=true`
+
+Restore example:
+
+```bash
+npm run db:restore:compose -- orders_db backups/orders_db-YYYYMMDD-HHMMSS.sql.gz
 ```
 
 ## Auth Hardening
