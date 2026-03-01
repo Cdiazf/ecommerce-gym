@@ -5,6 +5,7 @@ This repo now includes:
 - CI checks
 - Docker publish to GHCR
 - SSH deploy workflow for `staging` and `production`
+- automated database backup workflow
 - `CODEOWNERS`
 
 ## Branch Strategy
@@ -80,8 +81,12 @@ Recommended:
 Optional:
 
 - `VITE_API_URL`
+- `ENABLE_AUTOMATED_PRODUCTION_BACKUPS`
 
-This is used by the Docker publish workflow when building the frontend image.
+These are used for:
+
+- `VITE_API_URL`: frontend image build
+- `ENABLE_AUTOMATED_PRODUCTION_BACKUPS=true`: enable scheduled production DB backups
 
 ## 5. Server Layout
 
@@ -128,6 +133,7 @@ docker compose --env-file .env.<target> -f docker-compose.production.yml up -d -
 - network access to `ghcr.io`
 - login token with permission to pull packages
 - env file present and correct
+- enough disk space for retained backup files
 
 ## 9. Local Pre-Deploy Validation
 
@@ -143,4 +149,11 @@ Also validate compose-based migrations locally when testing deployment flow:
 
 ```bash
 npm run db:migrate:compose -- .env.production docker-compose.production.yml
+```
+
+Test backup and restore flow locally:
+
+```bash
+npm run db:backup:compose -- .env.production docker-compose.production.yml
+npm run db:restore:compose -- orders_db backups/orders_db-YYYYMMDD-HHMMSS.sql.gz .env.production docker-compose.production.yml
 ```
