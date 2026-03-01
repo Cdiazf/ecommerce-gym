@@ -7,6 +7,23 @@ This repo now includes:
 - SSH deploy workflow for `staging` and `production`
 - `CODEOWNERS`
 
+## Branch Strategy
+
+Use this branch model:
+
+- `main`: production-ready only
+- `staging`: pre-production integration branch
+- `develop`: ongoing internal integration
+- `feature/*`: short-lived task branches
+
+Recommended flow:
+
+1. Create a `feature/*` branch from `develop`
+2. Merge validated work into `develop`
+3. Promote selected changes from `develop` to `staging`
+4. Validate staging deployment
+5. Merge to `main` only when ready for production
+
 ## 1. Branch Protection
 
 Configure this in GitHub UI:
@@ -85,7 +102,7 @@ Example deploy directories:
 
 ### Staging
 
-- auto-deploys after `Publish Docker Images` completes successfully on `main`
+- auto-deploys after `Publish Docker Images` completes successfully on branch `staging`
 - can also be run manually via `workflow_dispatch`
 
 ### Production

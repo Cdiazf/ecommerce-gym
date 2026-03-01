@@ -160,8 +160,8 @@ bash scripts/repo/check-secrets.sh
   - frontend build
   - unit/e2e tests
   - tracked-file secret scan
-  - Docker image publish to GHCR on `main`
-  - SSH deploy to `staging` on `main`
+  - Docker image publish to GHCR on `main` and `staging`
+  - SSH deploy to `staging` from branch `staging`
   - manual SSH deploy to `production`
 
 ## Docker Image Publish
@@ -178,6 +178,7 @@ It publishes:
 Tags:
 
 - `latest` on `main`
+- `staging` on branch `staging`
 - short commit SHA on every publish
 
 Optional GitHub repository variable for frontend builds:
@@ -191,7 +192,12 @@ BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:latest
 FRONTEND_IMAGE=ghcr.io/<owner>/<repo>-frontend:latest
 ```
 
-For staging, use the same image variables in `.env.staging`.
+For staging, use branch-tagged images in `.env.staging`:
+
+```bash
+BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:staging
+FRONTEND_IMAGE=ghcr.io/<owner>/<repo>-frontend:staging
+```
 
 ## Deploy Environments
 
@@ -223,6 +229,15 @@ GitHub-side setup still required:
 See:
 
 - `docs/github-operations.md`
+
+## Branch Model
+
+Use:
+
+- `main`: production-ready only
+- `staging`: release candidate branch
+- `develop`: integration branch
+- `feature/*`: short-lived implementation branches
 
 ## Current Scope
 

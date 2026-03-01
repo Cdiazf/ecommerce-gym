@@ -18,7 +18,7 @@ on:
 
 jobs:
   deploy-staging:
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'staging') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
     runs-on: ubuntu-latest
     environment: staging
     steps:
