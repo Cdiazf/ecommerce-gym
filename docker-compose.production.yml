@@ -19,6 +19,12 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 30"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
 
   postgres:
     image: postgres:16-alpine
@@ -42,9 +48,17 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/main.js"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
 
   catalog:
     image: ${BACKEND_IMAGE:-agent-ai-backend:local}
@@ -55,8 +69,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/catalog/main.js"]
 
   cart:
@@ -68,8 +84,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/cart/main.js"]
 
   inventory:
@@ -81,8 +99,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/inventory/main.js"]
 
   orders:
@@ -94,8 +114,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/orders/main.js"]
 
   payments:
@@ -107,8 +129,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/payments/main.js"]
 
   shipping:
@@ -120,8 +144,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: ["node", "dist/microservices/shipping/main.js"]
 
   frontend:
@@ -133,7 +159,8 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     restart: unless-stopped
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
 
   caddy:
     image: caddy:2.8-alpine
@@ -141,8 +168,10 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - frontend
-      - gateway
+      frontend:
+        condition: service_started
+      gateway:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
