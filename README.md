@@ -277,6 +277,28 @@ Behavior:
 - same key + different payload: returns `409 Conflict`
 - concurrent duplicate request: returns `409 Conflict`
 
+## Culqi Sandbox
+
+The Culqi wallet integration is now aligned to a payment-order flow for Yape/QR:
+
+- `POST /payments/culqi/yape/charge`
+- `POST /payments/culqi/webhook`
+
+The route name is preserved for backward compatibility, but the backend now creates a Culqi payment order internally and expects webhook events shaped like `order.status.changed`.
+
+Recommended sandbox config:
+
+- `CULQI_SECRET_KEY=sk_test_...`
+- `CULQI_WEBHOOK_SIGNATURE_MODE=none`
+
+Manual local webhook replay:
+
+```bash
+bash scripts/payments/send-culqi-webhook.sh <internal_order_id> paid
+```
+
+This sends a local webhook payload compatible with the payment-order flow so you can validate order/payment state transitions before exposing a public webhook URL.
+
 GitHub-side setup still required:
 
 - branch protection for `main`

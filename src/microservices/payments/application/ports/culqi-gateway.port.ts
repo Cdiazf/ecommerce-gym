@@ -1,24 +1,26 @@
 export const CULQI_GATEWAY_PORT = Symbol('CULQI_GATEWAY_PORT');
 
 export interface CulqiGatewayPort {
-  createYapeToken(input: {
+  createPaymentOrder(input: {
     amountInCents: number;
+    currencyCode: 'PEN';
+    internalOrderId: string;
+    customerId: string;
     email: string;
     phoneNumber: string;
-    otp: string;
-  }): Promise<{ id: string }>;
-  createCharge(input: {
-    amountInCents: number;
-    email: string;
-    sourceId: string;
-    orderId: string;
-    customerId: string;
-  }): Promise<{ id: string; status: string }>;
+    firstName: string;
+    lastName: string;
+  }): Promise<{
+    id: string;
+    paymentCode: string | null;
+    paymentUrl: string | null;
+    status: string;
+  }>;
   verifyWebhookSignature(signature: string | undefined, payload: unknown): boolean;
   parseWebhook(payload: unknown): {
     orderId: string | null;
-    chargeId: string | null;
-    sourceId: string | null;
+    externalReference: string | null;
+    paymentCode: string | null;
     status: 'APPROVED' | 'FAILED' | 'EXPIRED' | 'IGNORED';
   };
 }

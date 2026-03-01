@@ -33,15 +33,17 @@ export class CreateCulqiYapeChargeUseCase {
     orderId: string;
     email: string;
     phoneNumber: string;
-    otp: string;
+    firstName?: string;
+    lastName?: string;
   }): Promise<{
     orderId: string;
     paymentId: string;
     status: Payment['status'];
     culqi: {
-      tokenId: string;
-      chargeId: string;
-      chargeStatus: string;
+      paymentOrderId: string;
+      paymentCode: string | null;
+      paymentUrl: string | null;
+      paymentStatus: string;
     };
   }> {
     const payment = await this.paymentRepository.findByOrderId(payload.orderId);
@@ -59,33 +61,29 @@ export class CreateCulqiYapeChargeUseCase {
     }
 
     const amountInCents = Math.round(payment.amount * 100);
-    const token = await this.culqiGateway.createYapeToken({
+    const paymentOrder = await this.culqiGateway.createPaymentOrder({
       amountInCents,
+      currencyCode: 'PEN',
+      internalOrderId: payment.orderId,
+      customerId: payment.customerId,
       email: payload.email,
       phoneNumber: payload.phoneNumber,
-      otp: payload.otp,
-    });
-
-    const charge = await this.culqiGateway.createCharge({
-      amountInCents,
-      email: payload.email,
-      sourceId: token.id,
-      orderId: payment.orderId,
-      customerId: payment.customerId,
+      firstName: payload.firstName?.trim() || 'Ecommerce',
+      lastName: payload.lastName?.trim() || 'Gym',
     });
 
     const nextStatus =
-      charge.status.toLowerCase().includes('paid') ||
-      charge.status.toLowerCase().includes('capture') ||
-      charge.status.toLowerCase().includes('success')
+      paymentOrder.status.toLowerCase().includes('paid') ||
+      paymentOrder.status.toLowerCase().includes('capture') ||
+      paymentOrder.status.toLowerCase().includes('success')
         ? 'APPROVED'
         : 'PENDING';
 
     const updated: Payment = {
       ...payment,
       status: nextStatus,
-      externalReference: charge.id,
-      operationCode: token.id,
+      externalReference: paymentOrder.id,
+      operationCode: paymentOrder.paymentCode,
       processedAt: new Date().toISOString(),
     };
 
@@ -99,9 +97,10 @@ export class CreateCulqiYapeChargeUseCase {
       paymentId: saved.id,
       status: saved.status,
       culqi: {
-        tokenId: token.id,
-        chargeId: charge.id,
-        chargeStatus: charge.status,
+        paymentOrderId: paymentOrder.id,
+        paymentCode: paymentOrder.paymentCode,
+        paymentUrl: paymentOrder.paymentUrl,
+        paymentStatus: paymentOrder.status,
       },
     };
   }

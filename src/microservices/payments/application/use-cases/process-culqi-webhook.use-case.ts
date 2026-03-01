@@ -49,8 +49,8 @@ export class ProcessCulqiWebhookUseCase {
     const updated: Payment = {
       ...existing,
       status: event.status,
-      externalReference: event.chargeId ?? existing.externalReference,
-      operationCode: event.sourceId ?? existing.operationCode,
+      externalReference: event.externalReference ?? existing.externalReference,
+      operationCode: event.paymentCode ?? existing.operationCode,
       processedAt: new Date().toISOString(),
     };
 

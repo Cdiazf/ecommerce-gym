@@ -831,7 +831,9 @@ export class GatewayController implements OnModuleInit {
       orderId: string;
       email: string;
       phoneNumber: string;
-      otp: string;
+      firstName?: string;
+      lastName?: string;
+      otp?: string;
     },
   ) {
     if (!request.user) {
@@ -842,6 +844,8 @@ export class GatewayController implements OnModuleInit {
       orderId: body.orderId,
       email: body.email,
       phoneNumber: body.phoneNumber,
+      firstName: body.firstName,
+      lastName: body.lastName,
       otp: body.otp,
     };
 
