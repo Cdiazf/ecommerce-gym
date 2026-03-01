@@ -1,6 +1,8 @@
 # compiled output
 /dist
 /node_modules
+/frontend/dist
+/frontend/node_modules
 /build
 frontend/dist
 frontend/node_modules
