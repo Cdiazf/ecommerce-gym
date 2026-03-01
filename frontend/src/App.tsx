@@ -5,68 +5,21 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { HomePage } from './pages/HomePage';
 import { ProductDetail } from './pages/ProductDetail';
 import { MyOrders } from './pages/MyOrders';
+import { useAuthSession } from './hooks/useAuthSession';
 import { apiFetch } from './shared/api';
+import { getCartStorageKey, hydrateCartItems } from './shared/cart-utils';
 import { formatPrice, getProductPrice } from './shared/product-utils';
 import type {
   CartResponse,
   CartItem,
-  LoginResponse,
   Product,
-  RegisterResponse,
   ShippingAddress,
   ShippingQuote,
   StockItem,
   StoredCartItem,
-  UserRole,
 } from './shared/types';
 
-type TokenPayload = {
-  username?: string;
-  role?: UserRole;
-};
-
-function getPayloadFromToken(token: string): TokenPayload {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return {};
-    }
-
-    const raw = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const normalized = raw.padEnd(Math.ceil(raw.length / 4) * 4, '=');
-    const decoded = atob(normalized);
-    return JSON.parse(decoded) as TokenPayload;
-  } catch {
-    return {};
-  }
-}
-
-function getCartStorageKey(username: string): string {
-  return `fitstore-cart:${username || 'guest'}`;
-}
-
-function hydrateCartItems(
-  items: StoredCartItem[],
-  products: Product[],
-): CartItem[] {
-  const productsById = new Map(products.map((product) => [product.id, product]));
-
-  return items.map((item) => {
-    const product = productsById.get(item.productId);
-
-    return {
-      productId: item.productId,
-      name: product?.name ?? item.productId,
-      price: product ? getProductPrice(product) : 0,
-      quantity: item.quantity,
-    };
-  });
-}
-
 export default function App() {
-  const initialToken = localStorage.getItem('accessToken') ?? '';
-  const initialPayload = getPayloadFromToken(initialToken);
-
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,16 +28,25 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isNavbarOpen, setIsNavbarOpen] = useState(false);
-
-  const [token, setToken] = useState(initialToken);
-  const [role, setRole] = useState<UserRole | ''>(initialPayload.role ?? '');
-  const [authUsername, setAuthUsername] = useState(initialPayload.username ?? '');
-
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('cliente');
-  const [password, setPassword] = useState('123456');
-  const [authError, setAuthError] = useState('');
-  const [authMessage, setAuthMessage] = useState('');
+  const {
+    token,
+    role,
+    authUsername,
+    isAuthenticated,
+    authMode,
+    username,
+    password,
+    authError,
+    authMessage,
+    setAuthMode,
+    setUsername,
+    setPassword,
+    setAuthError,
+    setAuthMessage,
+    login,
+    register,
+    logout,
+  } = useAuthSession();
 
   const [guestCartItems, setGuestCartItems] = useState<CartItem[]>([]);
   const [serverCartItems, setServerCartItems] = useState<StoredCartItem[]>([]);
@@ -115,8 +77,6 @@ export default function App() {
   const [category, setCategory] = useState('all');
   const [brand, setBrand] = useState('all');
   const [maxPrice, setMaxPrice] = useState<number>(500);
-
-  const isAuthenticated = token.length > 0;
 
   const notifyCartSync = useCallback(() => {
     if (typeof BroadcastChannel === 'undefined') {
@@ -256,29 +216,6 @@ export default function App() {
       channel?.close();
     };
   }, [authUsername, isAuthenticated, loadServerCart]);
-
-  useEffect(() => {
-    if (!token) {
-      setRole('');
-      setAuthUsername('');
-      setShippingAddresses([]);
-      setSelectedAddressId('');
-      setShippingQuote(null);
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('authUsername');
-      return;
-    }
-
-    const payload = getPayloadFromToken(token);
-    if (payload.role) {
-      setRole(payload.role);
-      localStorage.setItem('userRole', payload.role);
-    }
-    if (payload.username) {
-      setAuthUsername(payload.username);
-      localStorage.setItem('authUsername', payload.username);
-    }
-  }, [token]);
 
   useEffect(() => {
     let ignore = false;
@@ -615,60 +552,26 @@ export default function App() {
     setCheckoutMessage('');
   }
 
-  async function handleLogin(event: FormEvent) {
+  async function handleAuthSubmit(event: FormEvent) {
     event.preventDefault();
-    setAuthError('');
-    setAuthMessage('');
 
-    try {
-      const data = await apiFetch<LoginResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
-
-      setToken(data.accessToken);
-      setRole(data.role);
-      setAuthUsername(username.trim().toLowerCase());
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('userRole', data.role);
-      localStorage.setItem('authUsername', username.trim().toLowerCase());
-      setIsLoginModalOpen(false);
-    } catch (loginError) {
-      setAuthError(String(loginError));
+    if (authMode === 'login') {
+      const success = await login();
+      if (success) {
+        setIsLoginModalOpen(false);
+      }
+      return;
     }
-  }
 
-  async function handleRegister(event: FormEvent) {
-    event.preventDefault();
-    setAuthError('');
-    setAuthMessage('');
-
-    try {
-      const created = await apiFetch<RegisterResponse>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
-
-      setAuthMode('login');
-      setAuthMessage(
-        `User ${created.username} created. Now login with your credentials.`,
-      );
-    } catch (registerError) {
-      setAuthError(String(registerError));
-    }
+    await register();
   }
 
   function handleLogout() {
-    setToken('');
-    setRole('');
-    setAuthUsername('');
+    logout();
     setServerCartItems([]);
     setShippingAddresses([]);
     setSelectedAddressId('');
     setShippingQuote(null);
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('authUsername');
   }
 
   async function handleCreateAddress(event: FormEvent) {
@@ -1098,9 +1001,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <form
-                  onSubmit={authMode === 'login' ? handleLogin : handleRegister}
-                >
+                <form onSubmit={handleAuthSubmit}>
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label">Username</label>
