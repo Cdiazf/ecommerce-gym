@@ -115,6 +115,8 @@ Example deploy directories:
 The workflow runs:
 
 ```bash
+git fetch origin && git checkout <target-branch> && git pull --ff-only origin <target-branch>
+bash scripts/db/run-compose-migrations.sh .env.<target> docker-compose.production.yml
 docker compose --env-file .env.<target> -f docker-compose.production.yml pull
 docker compose --env-file .env.<target> -f docker-compose.production.yml up -d --no-build
 ```
@@ -126,3 +128,19 @@ docker compose --env-file .env.<target> -f docker-compose.production.yml up -d -
 - network access to `ghcr.io`
 - login token with permission to pull packages
 - env file present and correct
+
+## 9. Local Pre-Deploy Validation
+
+Before promoting changes to `staging` or `main`, validate the env file locally:
+
+```bash
+npm run ops:check:env
+```
+
+This fails if required variables are missing or still use placeholder values.
+
+Also validate compose-based migrations locally when testing deployment flow:
+
+```bash
+npm run db:migrate:compose -- .env.production docker-compose.production.yml
+```
