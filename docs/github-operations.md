@@ -126,3 +126,13 @@ docker compose --env-file .env.<target> -f docker-compose.production.yml up -d -
 - network access to `ghcr.io`
 - login token with permission to pull packages
 - env file present and correct
+
+## 9. Local Pre-Deploy Validation
+
+Before promoting changes to `staging` or `main`, validate the env file locally:
+
+```bash
+npm run ops:check:env
+```
+
+This fails if required variables are missing or still use placeholder values.

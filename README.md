@@ -82,6 +82,12 @@ Set, at minimum:
 - `CORS_ORIGIN`
 - `VITE_API_URL`
 
+Validate the file before deploy:
+
+```bash
+npm run ops:check:env
+```
+
 For staging, you can use:
 
 ```bash
@@ -111,6 +117,7 @@ npm run test:e2e
 npm run test:flow
 npm run db:migrate
 npm run db:backup
+npm run ops:check:env
 ```
 
 ## Health and Metrics
