@@ -51,10 +51,63 @@ done
 
 echo "Running migrations from $MIGRATIONS_DIR using service postgres..."
 
+compose exec -T postgres psql \
+  -v ON_ERROR_STOP=1 \
+  -U "$PGUSER_VALUE" \
+  -d postgres \
+  -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())" \
+  >/dev/null
+
+existing_bootstrap_count="$(
+  compose exec -T postgres psql \
+    -tA \
+    -U "$PGUSER_VALUE" \
+    -d postgres \
+    -c "SELECT COUNT(*) FROM pg_database WHERE datname IN ('catalog_db', 'inventory_db', 'orders_db', 'payments_db', 'shipping_db', 'auth_db')"
+)"
+
+tracked_count="$(
+  compose exec -T postgres psql \
+    -tA \
+    -U "$PGUSER_VALUE" \
+    -d postgres \
+    -c "SELECT COUNT(*) FROM schema_migrations"
+)"
+
+if [[ "${tracked_count:-0}" == "0" && "${existing_bootstrap_count:-0}" == "6" ]]; then
+  echo "Detected existing initialized databases without migration tracking. Bootstrapping migration history."
+  compose exec -T postgres psql \
+    -v ON_ERROR_STOP=1 \
+    -U "$PGUSER_VALUE" \
+    -d postgres \
+    -c "INSERT INTO schema_migrations (filename) VALUES ('001_schema.sql'), ('002_seed_baseline.sql') ON CONFLICT (filename) DO NOTHING" \
+    >/dev/null
+fi
+
 for file in "$MIGRATIONS_DIR"/*.sql; do
   [[ -e "$file" ]] || continue
-  echo "Applying $(basename "$file")"
+  filename="$(basename "$file")"
+  already_applied="$(
+    compose exec -T postgres psql \
+      -tA \
+      -U "$PGUSER_VALUE" \
+      -d postgres \
+      -c "SELECT 1 FROM schema_migrations WHERE filename = '$filename' LIMIT 1"
+  )"
+
+  if [[ "$already_applied" == "1" ]]; then
+    echo "Skipping $filename (already applied)"
+    continue
+  fi
+
+  echo "Applying $filename"
   compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$PGUSER_VALUE" -d postgres < "$file"
+  compose exec -T postgres psql \
+    -v ON_ERROR_STOP=1 \
+    -U "$PGUSER_VALUE" \
+    -d postgres \
+    -c "INSERT INTO schema_migrations (filename) VALUES ('$filename') ON CONFLICT (filename) DO NOTHING" \
+    >/dev/null
 done
 
 echo "Compose-based migrations completed."
