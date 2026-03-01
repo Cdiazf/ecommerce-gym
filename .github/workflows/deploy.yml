@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Publish Docker Images
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-staging:
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy staging over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.STAGING_DEPLOY_PATH }}
+            echo "${{ secrets.STAGING_GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.STAGING_GHCR_USERNAME }}" --password-stdin
+            docker compose --env-file .env.staging -f docker-compose.production.yml pull
+            docker compose --env-file .env.staging -f docker-compose.production.yml up -d --no-build
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy production over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_SSH_HOST }}
+          username: ${{ secrets.PRODUCTION_SSH_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+            echo "${{ secrets.PRODUCTION_GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.PRODUCTION_GHCR_USERNAME }}" --password-stdin
+            docker compose --env-file .env.production -f docker-compose.production.yml pull
+            docker compose --env-file .env.production -f docker-compose.production.yml up -d --no-build

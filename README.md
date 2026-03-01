@@ -82,6 +82,12 @@ Set, at minimum:
 - `CORS_ORIGIN`
 - `VITE_API_URL`
 
+For staging, you can use:
+
+```bash
+cp .env.staging.example .env.staging
+```
+
 ### 2. Build and start
 
 ```bash
@@ -155,6 +161,8 @@ bash scripts/repo/check-secrets.sh
   - unit/e2e tests
   - tracked-file secret scan
   - Docker image publish to GHCR on `main`
+  - SSH deploy to `staging` on `main`
+  - manual SSH deploy to `production`
 
 ## Docker Image Publish
 
@@ -182,6 +190,39 @@ To run production using registry images instead of local builds, set in `.env.pr
 BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:latest
 FRONTEND_IMAGE=ghcr.io/<owner>/<repo>-frontend:latest
 ```
+
+For staging, use the same image variables in `.env.staging`.
+
+## Deploy Environments
+
+The repo includes:
+
+- `.env.staging.example`
+- `.github/workflows/deploy.yml`
+- `.github/CODEOWNERS`
+- `docs/github-operations.md`
+
+Deployment strategy:
+
+- `staging`: auto-deploy after `Publish Docker Images` succeeds
+- `production`: manual deploy through `workflow_dispatch`
+
+The deploy workflow runs over SSH and executes:
+
+```bash
+docker compose --env-file .env.<target> -f docker-compose.production.yml pull
+docker compose --env-file .env.<target> -f docker-compose.production.yml up -d --no-build
+```
+
+GitHub-side setup still required:
+
+- branch protection for `main`
+- environments `staging` and `production`
+- SSH and GHCR secrets
+
+See:
+
+- `docs/github-operations.md`
 
 ## Current Scope
 
