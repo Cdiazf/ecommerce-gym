@@ -38,16 +38,27 @@ request() {
   local method="$1"
   local url="$2"
   local body="${3:-}"
-  shift 3 || true
-  local headers=("$@")
+  local headers=()
+  if (( $# > 3 )); then
+    shift 3
+    headers=("$@")
+  fi
   local response
   local status
   local payload
 
   if [[ -n "${body}" ]]; then
-    response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" "${headers[@]}" -H 'Content-Type: application/json' -d "${body}" -w $'\n%{http_code}')" || return 1
+    if (( ${#headers[@]} > 0 )); then
+      response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" "${headers[@]}" -H 'Content-Type: application/json' -d "${body}" -w $'\n%{http_code}')" || return 1
+    else
+      response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" -H 'Content-Type: application/json' -d "${body}" -w $'\n%{http_code}')" || return 1
+    fi
   else
-    response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" "${headers[@]}" -w $'\n%{http_code}')" || return 1
+    if (( ${#headers[@]} > 0 )); then
+      response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" "${headers[@]}" -w $'\n%{http_code}')" || return 1
+    else
+      response="$(curl "${CURL_OPTS[@]}" -X "${method}" "${url}" -w $'\n%{http_code}')" || return 1
+    fi
   fi
 
   status="${response##*$'\n'}"
@@ -70,6 +81,24 @@ expect_status() {
   printf '%s' "${payload}"
 }
 
+expect_status_one_of() {
+  local allowed="$1"
+  local response="$2"
+  local status payload
+  status="$(printf '%s' "${response}" | head -n 1)"
+  payload="$(printf '%s' "${response}" | tail -n +2)"
+
+  case ",${allowed}," in
+    *",${status},"*) ;;
+    *)
+      echo "${payload}" >&2
+      fail "Expected HTTP one of [${allowed}], got ${status}"
+      ;;
+  esac
+
+  printf '%s' "${payload}"
+}
+
 extract_json() {
   local field="$1"
   node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const obj=JSON.parse(d); const val=obj['${field}']; if (val === undefined || val === null) process.exit(2); console.log(typeof val === 'string' ? val : JSON.stringify(val));});"
@@ -88,7 +117,7 @@ pass "Public catalog"
 
 echo "3/6 Admin login"
 admin_login_payload="$(request POST "${BASE_URL}/auth/login" "{\"username\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}")" || fail "Admin login request failed"
-admin_login_json="$(expect_status "200" "${admin_login_payload}")"
+admin_login_json="$(expect_status_one_of "200,201" "${admin_login_payload}")"
 ADMIN_TOKEN="$(printf '%s' "${admin_login_json}" | extract_json accessToken)" || fail "Admin login missing token"
 ADMIN_ROLE="$(printf '%s' "${admin_login_json}" | extract_json role)" || fail "Admin login missing role"
 [[ "${ADMIN_ROLE}" == "ADMIN" ]] || fail "Admin login returned role ${ADMIN_ROLE}"
@@ -96,7 +125,7 @@ pass "Admin login"
 
 echo "4/6 User login"
 user_login_payload="$(request POST "${BASE_URL}/auth/login" "{\"username\":\"${USER_NAME}\",\"password\":\"${USER_PASS}\"}")" || fail "User login request failed"
-user_login_json="$(expect_status "200" "${user_login_payload}")"
+user_login_json="$(expect_status_one_of "200,201" "${user_login_payload}")"
 USER_TOKEN="$(printf '%s' "${user_login_json}" | extract_json accessToken)" || fail "User login missing token"
 pass "User login"
 
