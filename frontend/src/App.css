@@ -1,0 +1,93 @@
+.landing-page {
+  min-height: 100vh;
+}
+
+.hero {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.35), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(34, 197, 94, 0.35), transparent 42%),
+    linear-gradient(120deg, #111827, #1f2937);
+}
+
+.hero-card {
+  border: 1px solid #e5e7eb;
+}
+
+.product-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 1rem 1.5rem rgba(15, 23, 42, 0.12) !important;
+}
+
+.product-image {
+  height: 220px;
+  object-fit: cover;
+}
+
+.featured-card {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.featured-image {
+  height: 260px;
+  width: 100%;
+  object-fit: cover;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.site-footer {
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.14), transparent 30%),
+    #111827;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.footer-pill {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.footer-links li + li {
+  margin-top: 0.45rem;
+}
+
+.footer-links a,
+.footer-links span {
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: #ffffff;
+}
+
+.footer-status {
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+}
+
+.footer-bottom {
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal {
+  background: rgba(15, 23, 42, 0.2);
+}
