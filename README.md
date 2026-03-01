@@ -249,6 +249,34 @@ Configurable env vars:
 - `AUTH_REGISTER_WINDOW_SECONDS`
 - `AUTH_REGISTER_BLOCK_SECONDS`
 
+## Idempotency
+
+The gateway now supports persistent idempotency for:
+
+- `POST /orders`
+- `POST /payments/yape/start`
+- `POST /payments/yape/confirm`
+- `POST /payments/yape/retry`
+- `POST /payments/yape/fail`
+- `POST /payments/yape/expire`
+- `POST /payments/culqi/yape/charge`
+
+Use the `Idempotency-Key` header for client retries:
+
+```bash
+curl -X POST https://localhost/api/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Idempotency-Key: 8d8c4b6d-3c48-4d4b-b6fd-6af2ef0a2c15' \
+  -d '{ ... }'
+```
+
+Behavior:
+
+- same key + same payload: returns the original response
+- same key + different payload: returns `409 Conflict`
+- concurrent duplicate request: returns `409 Conflict`
+
 GitHub-side setup still required:
 
 - branch protection for `main`
