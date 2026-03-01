@@ -24,14 +24,20 @@
     "db:postgres:up": "docker compose -f docker-compose.postgres.yml up -d",
     "db:postgres:down": "docker compose -f docker-compose.postgres.yml down",
     "db:migrate": "bash scripts/db/run-migrations.sh",
+    "db:migrate:compose": "bash scripts/db/run-compose-migrations.sh",
     "db:backup": "bash scripts/db/backup-postgres.sh",
+    "db:backup:compose": "bash scripts/db/backup-postgres-compose.sh",
+    "db:restore:compose": "bash scripts/db/restore-postgres-compose.sh",
+    "ops:check:env": "bash scripts/ops/check-production-env.sh",
+    "test:local:idempotency-culqi": "bash ./scripts/tests/test-local-idempotency-culqi.sh",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:flow": "bash ./integration-test.sh"
+    "test:flow": "bash ./integration-test.sh",
+    "test:staging:smoke": "bash ./scripts/tests/smoke-test-staging.sh"
   },
   "dependencies": {
     "@nestjs/config": "^4.0.2",

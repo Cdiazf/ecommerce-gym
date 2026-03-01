@@ -27,6 +27,8 @@ export class AuthService implements OnModuleInit {
   constructor(private readonly userRepository: AuthUserRepository) {}
 
   async onModuleInit(): Promise<void> {
+    this.validateSecurityConfiguration();
+
     const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123';
     const demoPassword = process.env.DEMO_PASS ?? '123456';
 
@@ -43,6 +45,35 @@ export class AuthService implements OnModuleInit {
       passwordHash: this.hashPassword(demoPassword),
       role: 'USER',
     });
+  }
+
+  private validateSecurityConfiguration(): void {
+    const isProduction = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+    const insecureMarkers = ['replace-', 'change-me', 'example.com'];
+
+    if (!isProduction) {
+      return;
+    }
+
+    if (
+      this.tokenSecret.length < 32 ||
+      insecureMarkers.some((marker) => this.tokenSecret.includes(marker))
+    ) {
+      throw new Error(
+        'AUTH_TOKEN_SECRET is not production-safe. Use a long random secret.',
+      );
+    }
+
+    const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123';
+
+    if (
+      adminPassword.length < 12 ||
+      insecureMarkers.some((marker) => adminPassword.includes(marker))
+    ) {
+      throw new Error(
+        'ADMIN_PASSWORD is not production-safe. Use a strong non-placeholder password.',
+      );
+    }
   }
 
   async register(input: {
