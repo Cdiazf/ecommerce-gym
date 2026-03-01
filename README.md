@@ -154,6 +154,34 @@ bash scripts/repo/check-secrets.sh
   - frontend build
   - unit/e2e tests
   - tracked-file secret scan
+  - Docker image publish to GHCR on `main`
+
+## Docker Image Publish
+
+The repo includes a publish workflow:
+
+- `.github/workflows/docker-publish.yml`
+
+It publishes:
+
+- `ghcr.io/<owner>/<repo>-backend`
+- `ghcr.io/<owner>/<repo>-frontend`
+
+Tags:
+
+- `latest` on `main`
+- short commit SHA on every publish
+
+Optional GitHub repository variable for frontend builds:
+
+- `VITE_API_URL`
+
+To run production using registry images instead of local builds, set in `.env.production`:
+
+```bash
+BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:latest
+FRONTEND_IMAGE=ghcr.io/<owner>/<repo>-frontend:latest
+```
 
 ## Current Scope
 
