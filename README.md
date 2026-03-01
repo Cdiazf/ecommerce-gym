@@ -82,6 +82,12 @@ Set, at minimum:
 - `CORS_ORIGIN`
 - `VITE_API_URL`
 
+Validate the file before deploy:
+
+```bash
+npm run ops:check:env
+```
+
 For staging, you can use:
 
 ```bash
@@ -110,7 +116,11 @@ npm test
 npm run test:e2e
 npm run test:flow
 npm run db:migrate
+npm run db:migrate:compose
 npm run db:backup
+npm run db:backup:compose
+npm run db:restore:compose -- <db_name> <backup_file.sql.gz>
+npm run ops:check:env
 ```
 
 ## Health and Metrics
@@ -205,6 +215,7 @@ The repo includes:
 
 - `.env.staging.example`
 - `.github/workflows/deploy.yml`
+- `.github/workflows/database-backup.yml`
 - `.github/CODEOWNERS`
 - `docs/github-operations.md`
 
@@ -216,8 +227,109 @@ Deployment strategy:
 The deploy workflow runs over SSH and executes:
 
 ```bash
+git fetch origin && git checkout <target-branch> && git pull --ff-only origin <target-branch>
+bash scripts/db/run-compose-migrations.sh .env.<target> docker-compose.production.yml
 docker compose --env-file .env.<target> -f docker-compose.production.yml pull
 docker compose --env-file .env.<target> -f docker-compose.production.yml up -d --no-build
+```
+
+## Automated Backups
+
+The repo now includes compose-based backup and restore scripts:
+
+- `scripts/db/backup-postgres-compose.sh`
+- `scripts/db/restore-postgres-compose.sh`
+
+And an automated GitHub Actions workflow:
+
+- `.github/workflows/database-backup.yml`
+
+Behavior:
+
+- `staging`: nightly backup at `03:15 UTC`
+- `production`: manual backup by default
+- `production` scheduled backups can be enabled with repository variable:
+  - `ENABLE_AUTOMATED_PRODUCTION_BACKUPS=true`
+
+Restore example:
+
+```bash
+npm run db:restore:compose -- orders_db backups/orders_db-YYYYMMDD-HHMMSS.sql.gz
+```
+
+## Auth Hardening
+
+Authentication now includes:
+
+- IP-based rate limiting on `POST /auth/login`
+- IP-based rate limiting on `POST /auth/register`
+- production startup validation for:
+  - `AUTH_TOKEN_SECRET`
+  - `ADMIN_PASSWORD`
+
+Configurable env vars:
+
+- `AUTH_LOGIN_MAX_ATTEMPTS`
+- `AUTH_LOGIN_WINDOW_SECONDS`
+- `AUTH_LOGIN_BLOCK_SECONDS`
+- `AUTH_REGISTER_MAX_ATTEMPTS`
+- `AUTH_REGISTER_WINDOW_SECONDS`
+- `AUTH_REGISTER_BLOCK_SECONDS`
+
+## Idempotency
+
+The gateway now supports persistent idempotency for:
+
+- `POST /orders`
+- `POST /payments/yape/start`
+- `POST /payments/yape/confirm`
+- `POST /payments/yape/retry`
+- `POST /payments/yape/fail`
+- `POST /payments/yape/expire`
+- `POST /payments/culqi/yape/charge`
+
+Use the `Idempotency-Key` header for client retries:
+
+```bash
+curl -X POST https://localhost/api/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Idempotency-Key: 8d8c4b6d-3c48-4d4b-b6fd-6af2ef0a2c15' \
+  -d '{ ... }'
+```
+
+Behavior:
+
+- same key + same payload: returns the original response
+- same key + different payload: returns `409 Conflict`
+- concurrent duplicate request: returns `409 Conflict`
+
+## Culqi Sandbox
+
+The Culqi wallet integration is now aligned to a payment-order flow for Yape/QR:
+
+- `POST /payments/culqi/yape/charge`
+- `POST /payments/culqi/webhook`
+
+The route name is preserved for backward compatibility, but the backend now creates a Culqi payment order internally and expects webhook events shaped like `order.status.changed`.
+
+Recommended sandbox config:
+
+- `CULQI_SECRET_KEY=sk_test_...`
+- `CULQI_WEBHOOK_SIGNATURE_MODE=none`
+
+Manual local webhook replay:
+
+```bash
+bash scripts/payments/send-culqi-webhook.sh <internal_order_id> paid
+```
+
+This sends a local webhook payload compatible with the payment-order flow so you can validate order/payment state transitions before exposing a public webhook URL.
+
+One-shot local validation for this branch:
+
+```bash
+npm run test:local:idempotency-culqi
 ```
 
 GitHub-side setup still required:

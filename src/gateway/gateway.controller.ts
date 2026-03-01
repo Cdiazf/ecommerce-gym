@@ -23,6 +23,7 @@ import { RolesGuard } from './auth/roles.guard';
 import type { AuthenticatedRequest } from './auth/auth.guard';
 import { AuthUserRepository } from './auth/auth-user.repository';
 import { ShippingAddressRepository } from './auth/shipping-address.repository';
+import { IdempotencyService } from './idempotency.service';
 import {
   CreateOrderDto,
   CreateOrderItemDto,
@@ -164,6 +165,7 @@ export class GatewayController implements OnModuleInit {
     @Inject('CART_SERVICE') private readonly cartClient: ClientKafka,
     private readonly authUserRepository: AuthUserRepository,
     private readonly shippingAddressRepository: ShippingAddressRepository,
+    private readonly idempotencyService: IdempotencyService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -407,6 +409,7 @@ export class GatewayController implements OnModuleInit {
   @Post('orders')
   async createOrder(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: CreateOrderDto,
   ) {
     if (!request.user) {
@@ -429,33 +432,40 @@ export class GatewayController implements OnModuleInit {
     const shippingQuote = this.buildShippingQuote(address, body.items);
     const subtotalAmount = await this.calculateOrderSubtotal(body.items);
 
+    const payload = {
+      customerId: request.user.userId,
+      items: body.items,
+      paymentMethod: body.paymentMethod ?? 'AUTO',
+      subtotalAmount,
+      totalAmount: Number((subtotalAmount + shippingQuote.shippingCost).toFixed(2)),
+      shippingAddress: {
+        addressId: address.id,
+        label: address.label,
+        recipientName: address.recipientName,
+        phone: address.phone,
+        line1: address.line1,
+        line2: address.line2,
+        district: address.district,
+        city: address.city,
+        region: address.region,
+        postalCode: address.postalCode,
+        reference: address.reference,
+      },
+      shippingCost: shippingQuote.shippingCost,
+      shippingCurrency: shippingQuote.currency,
+      shippingServiceLevel: shippingQuote.serviceLevel,
+      estimatedDeliveryDays: shippingQuote.estimatedDeliveryDays,
+    };
+
     try {
-      return await firstValueFrom(
-        this.ordersClient.send('orders.create_order', {
-          customerId: request.user.userId,
-          items: body.items,
-          paymentMethod: body.paymentMethod ?? 'AUTO',
-          subtotalAmount,
-          totalAmount: Number((subtotalAmount + shippingQuote.shippingCost).toFixed(2)),
-          shippingAddress: {
-            addressId: address.id,
-            label: address.label,
-            recipientName: address.recipientName,
-            phone: address.phone,
-            line1: address.line1,
-            line2: address.line2,
-            district: address.district,
-            city: address.city,
-            region: address.region,
-            postalCode: address.postalCode,
-            reference: address.reference,
-          },
-          shippingCost: shippingQuote.shippingCost,
-          shippingCurrency: shippingQuote.currency,
-          shippingServiceLevel: shippingQuote.serviceLevel,
-          estimatedDeliveryDays: shippingQuote.estimatedDeliveryDays,
-        }),
-      );
+      return await this.idempotencyService.execute({
+        key: idempotencyKey,
+        routeScope: 'POST:/orders',
+        userScope: request.user.userId,
+        payload,
+        handler: () =>
+          firstValueFrom(this.ordersClient.send('orders.create_order', payload)),
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : JSON.stringify(error);
@@ -667,127 +677,188 @@ export class GatewayController implements OnModuleInit {
   @Post('payments/yape/start')
   startYapePayment(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; phone?: string },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.start_yape', {
-        orderId: body.orderId,
-        phone: body.phone,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+      phone: body.phone,
+    };
+
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.start_yape:${body.orderId}`,
+      routeScope: 'POST:/payments/yape/start',
+      userScope: request.user.userId,
+      payload,
+      handler: () =>
+        firstValueFrom(this.paymentsClient.send('payments.start_yape', payload)),
+    });
   }
 
   @UseGuards(AuthGuard)
   @Post('payments/yape/confirm')
   confirmYapePayment(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; operationCode: string },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.confirm_yape', {
-        orderId: body.orderId,
-        operationCode: body.operationCode,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+      operationCode: body.operationCode,
+    };
+
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.confirm_yape:${body.orderId}`,
+      routeScope: 'POST:/payments/yape/confirm',
+      userScope: request.user.userId,
+      payload,
+      handler: () =>
+        firstValueFrom(this.paymentsClient.send('payments.confirm_yape', payload)),
+    });
   }
 
   @UseGuards(AuthGuard)
   @Post('payments/yape/retry')
   async retryYapePayment(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; phone?: string },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    await firstValueFrom(
-      this.ordersClient.send('orders.retry_payment', {
-        orderId: body.orderId,
-        customerId: request.user.userId,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+      phone: body.phone,
+      customerId: request.user.userId,
+    };
 
-    await firstValueFrom(
-      this.paymentsClient.send('payments.retry_yape', {
-        orderId: body.orderId,
-      }),
-    );
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.retry_yape:${body.orderId}`,
+      routeScope: 'POST:/payments/yape/retry',
+      userScope: request.user.userId,
+      payload,
+      handler: async () => {
+        await firstValueFrom(
+          this.ordersClient.send('orders.retry_payment', {
+            orderId: body.orderId,
+            customerId: request.user?.userId,
+          }),
+        );
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.start_yape', {
-        orderId: body.orderId,
-        phone: body.phone,
-      }),
-    );
+        await firstValueFrom(
+          this.paymentsClient.send('payments.retry_yape', {
+            orderId: body.orderId,
+          }),
+        );
+
+        return firstValueFrom(
+          this.paymentsClient.send('payments.start_yape', {
+            orderId: body.orderId,
+            phone: body.phone,
+          }),
+        );
+      },
+    });
   }
 
   @UseGuards(AuthGuard)
   @Post('payments/yape/fail')
   failYapePayment(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; reason?: string },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.fail_yape', {
-        orderId: body.orderId,
-        reason: body.reason,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+      reason: body.reason,
+    };
+
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.fail_yape:${body.orderId}`,
+      routeScope: 'POST:/payments/yape/fail',
+      userScope: request.user.userId,
+      payload,
+      handler: () =>
+        firstValueFrom(this.paymentsClient.send('payments.fail_yape', payload)),
+    });
   }
 
   @UseGuards(AuthGuard)
   @Post('payments/yape/expire')
   expireYapePayment(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.expire_yape', {
-        orderId: body.orderId,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+    };
+
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.expire_yape:${body.orderId}`,
+      routeScope: 'POST:/payments/yape/expire',
+      userScope: request.user.userId,
+      payload,
+      handler: () =>
+        firstValueFrom(this.paymentsClient.send('payments.expire_yape', payload)),
+    });
   }
 
   @UseGuards(AuthGuard)
   @Post('payments/culqi/yape/charge')
   createCulqiYapeCharge(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: {
       orderId: string;
       email: string;
       phoneNumber: string;
-      otp: string;
+      firstName?: string;
+      lastName?: string;
+      otp?: string;
     },
   ) {
     if (!request.user) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return firstValueFrom(
-      this.paymentsClient.send('payments.create_culqi_yape_charge', {
-        orderId: body.orderId,
-        email: body.email,
-        phoneNumber: body.phoneNumber,
-        otp: body.otp,
-      }),
-    );
+    const payload = {
+      orderId: body.orderId,
+      email: body.email,
+      phoneNumber: body.phoneNumber,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      otp: body.otp,
+    };
+
+    return this.idempotencyService.execute({
+      key: idempotencyKey ?? `payments.culqi_yape_charge:${body.orderId}`,
+      routeScope: 'POST:/payments/culqi/yape/charge',
+      userScope: request.user.userId,
+      payload,
+      handler: () =>
+        firstValueFrom(
+          this.paymentsClient.send('payments.create_culqi_yape_charge', payload),
+        ),
+    });
   }
 
   @Post('payments/culqi/webhook')

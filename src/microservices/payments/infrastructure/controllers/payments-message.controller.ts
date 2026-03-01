@@ -66,7 +66,8 @@ export class PaymentsMessageController {
       orderId: string;
       email: string;
       phoneNumber: string;
-      otp: string;
+      firstName?: string;
+      lastName?: string;
     },
   ) {
     return this.createCulqiYapeChargeUseCase.execute(payload);
