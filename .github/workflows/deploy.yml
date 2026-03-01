@@ -33,7 +33,11 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.STAGING_DEPLOY_PATH }}
+            git fetch origin
+            git checkout staging
+            git pull --ff-only origin staging
             echo "${{ secrets.STAGING_GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.STAGING_GHCR_USERNAME }}" --password-stdin
+            bash scripts/db/run-compose-migrations.sh .env.staging docker-compose.production.yml
             docker compose --env-file .env.staging -f docker-compose.production.yml pull
             docker compose --env-file .env.staging -f docker-compose.production.yml up -d --no-build
 
@@ -53,6 +57,10 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
             echo "${{ secrets.PRODUCTION_GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.PRODUCTION_GHCR_USERNAME }}" --password-stdin
+            bash scripts/db/run-compose-migrations.sh .env.production docker-compose.production.yml
             docker compose --env-file .env.production -f docker-compose.production.yml pull
             docker compose --env-file .env.production -f docker-compose.production.yml up -d --no-build

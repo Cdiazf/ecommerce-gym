@@ -5,6 +5,8 @@ import { AUTH_PG_POOL, AuthUserRepository } from './auth-user.repository';
 import { ShippingAddressRepository } from './shipping-address.repository';
 import { createPostgresPool } from '../../shared/postgres/postgres.config';
 import { RolesGuard } from './roles.guard';
+import { AuthRateLimitGuard } from './auth-rate-limit.guard';
+import { AuthRateLimitService } from './auth-rate-limit.service';
 
 @Module({
   controllers: [AuthController],
@@ -21,7 +23,14 @@ import { RolesGuard } from './roles.guard';
     ShippingAddressRepository,
     AuthService,
     RolesGuard,
+    AuthRateLimitService,
+    AuthRateLimitGuard,
   ],
-  exports: [AuthService, RolesGuard, AuthUserRepository, ShippingAddressRepository],
+  exports: [
+    AuthService,
+    RolesGuard,
+    AuthUserRepository,
+    ShippingAddressRepository,
+  ],
 })
 export class AuthModule {}
