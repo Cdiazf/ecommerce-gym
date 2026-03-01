@@ -299,6 +299,12 @@ bash scripts/payments/send-culqi-webhook.sh <internal_order_id> paid
 
 This sends a local webhook payload compatible with the payment-order flow so you can validate order/payment state transitions before exposing a public webhook URL.
 
+One-shot local validation for this branch:
+
+```bash
+npm run test:local:idempotency-culqi
+```
+
 GitHub-side setup still required:
 
 - branch protection for `main`
