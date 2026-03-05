@@ -231,6 +231,19 @@ export class PostgresProductRepository
     }));
   }
 
+  async findNewArrivals(limit: number): Promise<Product[]> {
+    const products = await this.findAll();
+    const cappedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 8;
+
+    return products
+      .slice()
+      .sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      )
+      .slice(0, cappedLimit);
+  }
+
   async createProduct(input: CreateProductRequest): Promise<Product> {
     const result = await this.pool.query<ProductRow>(
       `INSERT INTO products

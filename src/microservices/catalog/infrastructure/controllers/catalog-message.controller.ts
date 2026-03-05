@@ -56,6 +56,11 @@ export class CatalogMessageController {
     return this.productQuery.listCategories();
   }
 
+  @MessagePattern('catalog.get_new_arrivals')
+  getNewArrivals(@Payload() payload?: { limit?: number }) {
+    return this.productQuery.findNewArrivals(payload?.limit ?? 8);
+  }
+
   @MessagePattern('catalog.create_product')
   createProduct(@Payload() payload: CreateProductRequest) {
     return this.createProductUseCase.execute(payload);

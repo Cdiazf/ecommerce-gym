@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { OrderRepositoryPort } from '../../application/ports/order-repository.port';
+import {
+  BestSellerProductStat,
+  OrderRepositoryPort,
+} from '../../application/ports/order-repository.port';
 import { Order, OrderItem } from '../../domain/order';
 import type { Pool } from 'pg';
 
@@ -34,6 +37,11 @@ interface OrderItemRow {
   order_id: string;
   product_id: string;
   quantity: number;
+}
+
+interface BestSellerRow {
+  product_id: string;
+  total_sold: string | number;
 }
 
 @Injectable()
@@ -184,6 +192,26 @@ export class PostgresOrderRepository implements OrderRepositoryPort {
 
   async findByCustomerId(customerId: string): Promise<Order[]> {
     return this.fetchOrders(customerId);
+  }
+
+  async findBestSellerProducts(limit: number): Promise<BestSellerProductStat[]> {
+    await this.ensureSchema();
+    const cappedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 8;
+    const result = await this.pool.query<BestSellerRow>(
+      `SELECT oi.product_id, SUM(oi.quantity)::int AS total_sold
+       FROM order_items oi
+       INNER JOIN orders o ON o.id = oi.order_id
+       WHERE o.status = 'PAID'
+       GROUP BY oi.product_id
+       ORDER BY total_sold DESC, oi.product_id ASC
+       LIMIT $1`,
+      [cappedLimit],
+    );
+
+    return result.rows.map((row) => ({
+      productId: row.product_id,
+      totalSold: Number(row.total_sold),
+    }));
   }
 
   private async fetchOrders(customerId?: string): Promise<Order[]> {

@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { OrderRepositoryPort } from '../../application/ports/order-repository.port';
+import {
+  BestSellerProductStat,
+  OrderRepositoryPort,
+} from '../../application/ports/order-repository.port';
 import { Order } from '../../domain/order';
 
 @Injectable()
@@ -39,5 +42,26 @@ export class InMemoryOrderRepository implements OrderRepositoryPort {
     return Promise.resolve(
       this.orders.filter((order) => order.customerId === customerId),
     );
+  }
+
+  findBestSellerProducts(limit: number): Promise<BestSellerProductStat[]> {
+    const sales = new Map<string, number>();
+    for (const order of this.orders) {
+      if (order.status !== 'PAID') {
+        continue;
+      }
+
+      for (const item of order.items) {
+        sales.set(item.productId, (sales.get(item.productId) ?? 0) + item.quantity);
+      }
+    }
+
+    const cappedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 8;
+    const ranked = Array.from(sales.entries())
+      .map(([productId, totalSold]) => ({ productId, totalSold }))
+      .sort((left, right) => right.totalSold - left.totalSold)
+      .slice(0, cappedLimit);
+
+    return Promise.resolve(ranked);
   }
 }

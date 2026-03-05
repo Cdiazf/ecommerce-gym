@@ -21,6 +21,8 @@ import type {
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [bestSellerProducts, setBestSellerProducts] = useState<Product[]>([]);
+  const [newArrivalProducts, setNewArrivalProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -225,13 +227,18 @@ export default function App() {
       setError('');
 
       try {
-        const [productsData, inventoryData] = await Promise.all([
+        const [productsData, inventoryData, bestSellersData, newArrivalsData] =
+          await Promise.all([
           apiFetch<Product[]>('/products'),
           apiFetch<StockItem[]>('/inventory'),
+          apiFetch<Product[]>('/products/best-sellers?limit=4'),
+          apiFetch<Product[]>('/products/new-arrivals?limit=4'),
         ]);
         if (!ignore) {
           setProducts(productsData);
           setInventory(inventoryData);
+          setBestSellerProducts(bestSellersData);
+          setNewArrivalProducts(newArrivalsData);
         }
       } catch (loadError) {
         if (!ignore) {
@@ -858,6 +865,8 @@ export default function App() {
               categories={categories}
               brands={brands}
               filteredProducts={filteredProducts}
+              bestSellers={bestSellerProducts}
+              newArrivals={newArrivalProducts}
               inventoryByProduct={inventoryByProduct}
               onQueryChange={setQuery}
               onCategoryChange={setCategory}

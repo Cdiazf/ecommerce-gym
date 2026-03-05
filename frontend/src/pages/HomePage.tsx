@@ -17,6 +17,8 @@ type HomePageProps = {
   categories: string[];
   brands: string[];
   filteredProducts: Product[];
+  bestSellers: Product[];
+  newArrivals: Product[];
   inventoryByProduct: Map<string, StockItem>;
   onQueryChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
@@ -36,6 +38,8 @@ export function HomePage(props: HomePageProps) {
     categories,
     brands,
     filteredProducts,
+    bestSellers,
+    newArrivals,
     inventoryByProduct,
     onQueryChange,
     onCategoryChange,
@@ -51,13 +55,16 @@ export function HomePage(props: HomePageProps) {
       return rightScore - leftScore;
     })
     .slice(0, 3);
-  const bestSellers = [...filteredProducts]
+  const fallbackBestSellers = [...filteredProducts]
     .sort((left, right) => getProductPrice(right) - getProductPrice(left))
     .slice(0, 4);
-  const newArrivals = [...filteredProducts]
+  const fallbackNewArrivals = [...filteredProducts]
     .slice()
     .reverse()
     .slice(0, 4);
+  const bestSellersToRender = bestSellers.length > 0 ? bestSellers : fallbackBestSellers;
+  const newArrivalsToRender =
+    newArrivals.length > 0 ? newArrivals : fallbackNewArrivals;
   const collectionCategories = categories.filter((value) => value !== 'All').slice(0, 4);
   const hasProducts = filteredProducts.length > 0;
 
@@ -310,7 +317,7 @@ export function HomePage(props: HomePageProps) {
             <span className="text-secondary small">Lo mas vendido</span>
           </div>
           <div className="row g-4">
-            {bestSellers.map((product) => {
+            {bestSellersToRender.map((product) => {
               const imageUrl = resolveImageUrl(product.images[0]?.url, FALLBACK_PRODUCT_IMAGE);
               return (
                 <div className="col-md-6 col-xl-3" key={`best-${product.id}`}>
@@ -342,7 +349,7 @@ export function HomePage(props: HomePageProps) {
                 </div>
               );
             })}
-            {bestSellers.length === 0 && (
+            {bestSellersToRender.length === 0 && (
               <div className="col-12">
                 <div className="alert alert-secondary mb-0">No hay best sellers disponibles.</div>
               </div>
@@ -356,7 +363,7 @@ export function HomePage(props: HomePageProps) {
             <span className="text-secondary small">Nuevos ingresos en catalogo</span>
           </div>
           <div className="row g-3">
-            {newArrivals.map((product) => (
+            {newArrivalsToRender.map((product) => (
               <div className="col-md-6" key={`new-${product.id}`}>
                 <article className="card border-0 shadow-sm h-100">
                   <div className="card-body d-flex justify-content-between align-items-start gap-3">
@@ -377,7 +384,7 @@ export function HomePage(props: HomePageProps) {
                 </article>
               </div>
             ))}
-            {newArrivals.length === 0 && (
+            {newArrivalsToRender.length === 0 && (
               <div className="col-12">
                 <div className="alert alert-secondary mb-0">No hay nuevos ingresos.</div>
               </div>

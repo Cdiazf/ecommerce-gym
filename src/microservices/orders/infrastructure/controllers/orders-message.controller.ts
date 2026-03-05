@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CreateOrderUseCase } from '../../application/use-cases/create-order.use-case';
 import { GetAllOrdersUseCase } from '../../application/use-cases/get-all-orders.use-case';
+import { GetBestSellerProductsUseCase } from '../../application/use-cases/get-best-seller-products.use-case';
 import { GetOrdersByCustomerUseCase } from '../../application/use-cases/get-orders-by-customer.use-case';
 import { RetryPaymentUseCase } from '../../application/use-cases/retry-payment.use-case';
 
@@ -35,6 +36,7 @@ export class OrdersMessageController {
   constructor(
     private readonly createOrderUseCase: CreateOrderUseCase,
     private readonly getAllOrdersUseCase: GetAllOrdersUseCase,
+    private readonly getBestSellerProductsUseCase: GetBestSellerProductsUseCase,
     private readonly getOrdersByCustomerUseCase: GetOrdersByCustomerUseCase,
     private readonly retryPaymentUseCase: RetryPaymentUseCase,
   ) {}
@@ -52,6 +54,11 @@ export class OrdersMessageController {
   @MessagePattern('orders.get_by_customer')
   getOrdersByCustomer(@Payload() payload: { customerId: string }) {
     return this.getOrdersByCustomerUseCase.execute(payload.customerId);
+  }
+
+  @MessagePattern('orders.get_best_sellers')
+  getBestSellerProducts(@Payload() payload?: { limit?: number }) {
+    return this.getBestSellerProductsUseCase.execute(payload?.limit ?? 8);
   }
 
   @MessagePattern('orders.retry_payment')

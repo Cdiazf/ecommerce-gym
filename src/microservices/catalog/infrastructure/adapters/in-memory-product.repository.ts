@@ -85,4 +85,17 @@ export class InMemoryProductRepository implements ProductQueryPort {
 
     return Promise.resolve(Array.from(categoriesMap.values()));
   }
+
+  findNewArrivals(limit: number): Promise<Product[]> {
+    const cappedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 8;
+    const sorted = this.products
+      .slice()
+      .sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      )
+      .slice(0, cappedLimit);
+
+    return Promise.resolve(sorted);
+  }
 }

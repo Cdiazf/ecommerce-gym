@@ -154,6 +154,11 @@ interface CatalogProductView {
   variants: CatalogVariantView[];
 }
 
+interface BestSellerProductStat {
+  productId: string;
+  totalSold: number;
+}
+
 @Controller()
 export class GatewayController implements OnModuleInit {
   constructor(
@@ -189,9 +194,11 @@ export class GatewayController implements OnModuleInit {
     this.catalogClient.subscribeToResponseOf('catalog.delete_category');
     this.catalogClient.subscribeToResponseOf('catalog.assign_category');
     this.catalogClient.subscribeToResponseOf('catalog.unassign_category');
+    this.catalogClient.subscribeToResponseOf('catalog.get_new_arrivals');
     this.ordersClient.subscribeToResponseOf('orders.create_order');
     this.ordersClient.subscribeToResponseOf('orders.get_all');
     this.ordersClient.subscribeToResponseOf('orders.get_by_customer');
+    this.ordersClient.subscribeToResponseOf('orders.get_best_sellers');
     this.ordersClient.subscribeToResponseOf('orders.retry_payment');
     this.inventoryClient.subscribeToResponseOf('inventory.get_stock');
     this.inventoryClient.subscribeToResponseOf('inventory.upsert_stock_item');
@@ -225,6 +232,49 @@ export class GatewayController implements OnModuleInit {
     return firstValueFrom(this.catalogClient.send('catalog.get_products', {}));
   }
 
+  @Get('products/new-arrivals')
+  getNewArrivals(@Req() req: { query?: { limit?: string } }) {
+    const limit = this.parsePositiveLimit(req.query?.limit, 8);
+    return firstValueFrom(
+      this.catalogClient.send('catalog.get_new_arrivals', { limit }),
+    );
+  }
+
+  @Get('products/best-sellers')
+  async getBestSellers(@Req() req: { query?: { limit?: string } }) {
+    const limit = this.parsePositiveLimit(req.query?.limit, 8);
+
+    const [stats, products] = await Promise.all([
+      firstValueFrom(
+        this.ordersClient.send<BestSellerProductStat[]>(
+          'orders.get_best_sellers',
+          { limit },
+        ),
+      ),
+      firstValueFrom(
+        this.catalogClient.send<CatalogProductView[]>('catalog.get_products', {}),
+      ),
+    ]);
+
+    const productsById = new Map(products.map((product) => [product.id, product]));
+
+    return stats
+      .map((entry) => {
+        const product = productsById.get(entry.productId);
+        if (!product) {
+          return null;
+        }
+
+        return {
+          ...product,
+          totalSold: entry.totalSold,
+        };
+      })
+      .filter((product): product is CatalogProductView & { totalSold: number } =>
+        Boolean(product),
+      );
+  }
+
   @Post('catalog/products')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -232,6 +282,19 @@ export class GatewayController implements OnModuleInit {
     return firstValueFrom(
       this.catalogClient.send('catalog.create_product', body),
     );
+  }
+
+  private parsePositiveLimit(rawLimit: string | undefined, defaultLimit: number): number {
+    if (!rawLimit) {
+      return defaultLimit;
+    }
+
+    const numericLimit = Number.parseInt(rawLimit, 10);
+    if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
+      return defaultLimit;
+    }
+
+    return numericLimit;
   }
 
   @Post('catalog/variants')

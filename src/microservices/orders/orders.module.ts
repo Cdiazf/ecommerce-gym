@@ -6,6 +6,7 @@ import { ORDER_REPOSITORY_PORT } from './application/ports/order-repository.port
 import { CreateOrderUseCase } from './application/use-cases/create-order.use-case';
 import { CancelOrderUseCase } from './application/use-cases/cancel-order.use-case';
 import { GetAllOrdersUseCase } from './application/use-cases/get-all-orders.use-case';
+import { GetBestSellerProductsUseCase } from './application/use-cases/get-best-seller-products.use-case';
 import { GetOrdersByCustomerUseCase } from './application/use-cases/get-orders-by-customer.use-case';
 import { MarkOrderPaidUseCase } from './application/use-cases/mark-order-paid.use-case';
 import { RetryPaymentUseCase } from './application/use-cases/retry-payment.use-case';
@@ -56,6 +57,7 @@ import { createPostgresPool } from '../../shared/postgres/postgres.config';
     CreateOrderUseCase,
     CancelOrderUseCase,
     GetAllOrdersUseCase,
+    GetBestSellerProductsUseCase,
     GetOrdersByCustomerUseCase,
     MarkOrderPaidUseCase,
     RetryPaymentUseCase,

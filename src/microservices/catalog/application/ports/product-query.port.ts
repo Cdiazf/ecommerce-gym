@@ -6,4 +6,5 @@ export interface ProductQueryPort {
   findAll(): Promise<Product[]>;
   findById(productId: string): Promise<Product | null>;
   listCategories(): Promise<ProductCategory[]>;
+  findNewArrivals(limit: number): Promise<Product[]>;
 }
