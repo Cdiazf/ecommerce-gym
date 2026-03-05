@@ -51,6 +51,15 @@ export function HomePage(props: HomePageProps) {
       return rightScore - leftScore;
     })
     .slice(0, 3);
+  const bestSellers = [...filteredProducts]
+    .sort((left, right) => getProductPrice(right) - getProductPrice(left))
+    .slice(0, 4);
+  const newArrivals = [...filteredProducts]
+    .slice()
+    .reverse()
+    .slice(0, 4);
+  const collectionCategories = categories.filter((value) => value !== 'All').slice(0, 4);
+  const hasProducts = filteredProducts.length > 0;
 
   return (
     <>
@@ -83,6 +92,54 @@ export function HomePage(props: HomePageProps) {
       </header>
 
       <main className="container py-5">
+        <section className="trust-strip card border-0 shadow-sm mb-4">
+          <div className="card-body py-3">
+            <div className="row g-3 text-center text-md-start">
+              <div className="col-md-3">
+                <p className="small text-secondary mb-1">Shipping</p>
+                <p className="mb-0 fw-semibold">Entrega en 24-72 horas</p>
+              </div>
+              <div className="col-md-3">
+                <p className="small text-secondary mb-1">Returns</p>
+                <p className="mb-0 fw-semibold">Cambios en 30 dias</p>
+              </div>
+              <div className="col-md-3">
+                <p className="small text-secondary mb-1">Payments</p>
+                <p className="mb-0 fw-semibold">Pago seguro y protegido</p>
+              </div>
+              <div className="col-md-3">
+                <p className="small text-secondary mb-1">Support</p>
+                <p className="mb-0 fw-semibold">Atencion 24/7</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="collections" className="mb-5">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="h3 mb-0">Colecciones</h2>
+            <span className="text-secondary small">Compra por objetivo de entrenamiento</span>
+          </div>
+          <div className="row g-3">
+            {collectionCategories.map((value) => (
+              <div className="col-6 col-md-3" key={value}>
+                <button
+                  type="button"
+                  className="btn btn-outline-dark w-100 py-3 collection-card"
+                  onClick={() => onCategoryChange(value)}
+                >
+                  {value}
+                </button>
+              </div>
+            ))}
+            {collectionCategories.length === 0 && (
+              <div className="col-12">
+                <div className="alert alert-secondary mb-0">No hay colecciones disponibles.</div>
+              </div>
+            )}
+          </div>
+        </section>
+
         <section id="featured-products" className="mb-5">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h2 className="h3 mb-0">Productos Destacados</h2>
@@ -156,7 +213,28 @@ export function HomePage(props: HomePageProps) {
           </div>
         </section>
 
-        <section id="filters" className="card border-0 shadow-sm mb-4">
+        <section id="promo" className="promo-banner card border-0 shadow-sm mb-5">
+          <div className="card-body p-4 p-lg-5">
+            <div className="row g-4 align-items-center">
+              <div className="col-lg-8">
+                <p className="text-uppercase small text-secondary mb-1">Oferta destacada</p>
+                <h2 className="h3 mb-2">Hasta 30% off en Running y Training</h2>
+                <p className="mb-0 text-secondary">
+                  Activa hoy en productos seleccionados. Valida disponibilidad por talla y stock.
+                </p>
+              </div>
+              <div className="col-lg-4">
+                <div className="d-flex gap-2 justify-content-lg-end">
+                  <span className="promo-time-pill">09d</span>
+                  <span className="promo-time-pill">14h</span>
+                  <span className="promo-time-pill">38m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="filters" className="card border-0 shadow-sm mb-5 sticky-filter-card">
           <div className="card-body">
             <div className="row g-3 align-items-end">
               <div className="col-md-4">
@@ -209,6 +287,101 @@ export function HomePage(props: HomePageProps) {
                 />
               </div>
             </div>
+            <div className="d-flex gap-2 mt-3">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => {
+                  onQueryChange('');
+                  onCategoryChange('All');
+                  onBrandChange('All');
+                  onMaxPriceChange(500);
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="best-sellers" className="mb-5">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="h3 mb-0">Best Sellers</h2>
+            <span className="text-secondary small">Lo mas vendido</span>
+          </div>
+          <div className="row g-4">
+            {bestSellers.map((product) => {
+              const imageUrl = resolveImageUrl(product.images[0]?.url, FALLBACK_PRODUCT_IMAGE);
+              return (
+                <div className="col-md-6 col-xl-3" key={`best-${product.id}`}>
+                  <article className="card border-0 shadow-sm h-100 product-card">
+                    <Link to={`/product/${product.id}`}>
+                      <img
+                        src={imageUrl}
+                        className="card-img-top product-image"
+                        alt={product.images[0]?.altText ?? product.name}
+                        onError={(event) => {
+                          event.currentTarget.src = FALLBACK_PRODUCT_IMAGE;
+                        }}
+                      />
+                    </Link>
+                    <div className="card-body">
+                      <p className="text-uppercase small text-secondary mb-2">{product.brand}</p>
+                      <h3 className="h6 mb-2">{product.name}</h3>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <strong>{formatPrice(getProductPrice(product))}</strong>
+                        <button
+                          className="btn btn-outline-dark btn-sm"
+                          onClick={() => onAddToCart(product)}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              );
+            })}
+            {bestSellers.length === 0 && (
+              <div className="col-12">
+                <div className="alert alert-secondary mb-0">No hay best sellers disponibles.</div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="new-arrivals" className="mb-5">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="h3 mb-0">New Arrivals</h2>
+            <span className="text-secondary small">Nuevos ingresos en catalogo</span>
+          </div>
+          <div className="row g-3">
+            {newArrivals.map((product) => (
+              <div className="col-md-6" key={`new-${product.id}`}>
+                <article className="card border-0 shadow-sm h-100">
+                  <div className="card-body d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                      <p className="small text-secondary text-uppercase mb-1">{product.brand}</p>
+                      <h3 className="h6 mb-1">{product.name}</h3>
+                      <p className="small text-secondary mb-0">
+                        {product.description ?? 'No description available'}
+                      </p>
+                    </div>
+                    <div className="text-end">
+                      <strong className="d-block mb-2">{formatPrice(getProductPrice(product))}</strong>
+                      <Link to={`/product/${product.id}`} className="btn btn-sm btn-dark">
+                        Ver
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            ))}
+            {newArrivals.length === 0 && (
+              <div className="col-12">
+                <div className="alert alert-secondary mb-0">No hay nuevos ingresos.</div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -286,6 +459,76 @@ export function HomePage(props: HomePageProps) {
                 </div>
               );
             })}
+            {!loading && !error && !hasProducts && (
+              <div className="col-12">
+                <div className="alert alert-secondary mb-0">
+                  No products match the current filters.
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="social-proof" className="mt-5 mb-5">
+          <div className="row g-4">
+            <div className="col-lg-4">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <p className="small text-secondary mb-2">Clientes activos</p>
+                  <p className="display-6 fw-bold mb-1">12K+</p>
+                  <p className="mb-0 text-secondary">Compradores en Peru y LATAM.</p>
+                </div>
+              </div>
+            </div>
+            <div className="col-lg-4">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <p className="small text-secondary mb-2">Valoracion promedio</p>
+                  <p className="display-6 fw-bold mb-1">4.8/5</p>
+                  <p className="mb-0 text-secondary">Resenas verificadas de productos.</p>
+                </div>
+              </div>
+            </div>
+            <div className="col-lg-4">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <p className="small text-secondary mb-2">Entrega a tiempo</p>
+                  <p className="display-6 fw-bold mb-1">97%</p>
+                  <p className="mb-0 text-secondary">Cumplimiento logístico mensual.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="newsletter" className="newsletter card border-0 shadow-sm mt-4">
+          <div className="card-body p-4 p-lg-5">
+            <div className="row g-3 align-items-center">
+              <div className="col-lg-7">
+                <h2 className="h4 mb-2">Recibe ofertas y lanzamientos</h2>
+                <p className="mb-0 text-secondary">
+                  Suscribete y recibe un descuento para tu primera compra.
+                </p>
+              </div>
+              <div className="col-lg-5">
+                <form
+                  className="d-flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                  }}
+                >
+                  <input
+                    type="email"
+                    className="form-control"
+                    placeholder="tu-email@correo.com"
+                    required
+                  />
+                  <button type="submit" className="btn btn-dark">
+                    Suscribir
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </section>
       </main>
