@@ -11,6 +11,8 @@ export class CulqiHttpGateway implements CulqiGatewayPort {
   private readonly webhookSignatureMode = (
     process.env.CULQI_WEBHOOK_SIGNATURE_MODE ?? 'none'
   ).toLowerCase();
+  private readonly isProduction =
+    (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
   private readonly walletOrderExpirationMinutes = Number(
     process.env.CULQI_WALLET_ORDER_EXPIRATION_MINUTES ?? 15,
   );
@@ -72,8 +74,12 @@ export class CulqiHttpGateway implements CulqiGatewayPort {
   }
 
   verifyWebhookSignature(signature: string | undefined, payload: unknown): boolean {
-    if (this.webhookSignatureMode === 'none' || !this.webhookSecret) {
-      return true;
+    if (this.webhookSignatureMode === 'none') {
+      return !this.isProduction;
+    }
+
+    if (!this.webhookSecret) {
+      return false;
     }
 
     if (!signature) {

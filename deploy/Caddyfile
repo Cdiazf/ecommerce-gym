@@ -1,4 +1,4 @@
-{$APP_DOMAIN} {
+{$APP_DOMAIN}, :443 {
   encode gzip zstd
 
   handle_path /api/* {

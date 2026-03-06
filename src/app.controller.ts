@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, NotFoundException } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -22,6 +22,10 @@ export class AppController {
 
   @Get('metrics')
   getMetrics() {
+    if ((process.env.NODE_ENV ?? '').toLowerCase() === 'production') {
+      throw new NotFoundException();
+    }
+
     const memory = process.memoryUsage();
 
     return {

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Controller,
   Delete,
+  NotFoundException,
   Get,
   Headers,
   Inject,
@@ -21,6 +22,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { Roles } from './auth/roles.decorator';
 import { RolesGuard } from './auth/roles.guard';
 import type { AuthenticatedRequest } from './auth/auth.guard';
+import type { AuthenticatedUser } from './auth/auth.types';
 import { AuthUserRepository } from './auth/auth-user.repository';
 import { ShippingAddressRepository } from './auth/shipping-address.repository';
 import { IdempotencyService } from './idempotency.service';
@@ -157,6 +159,16 @@ interface CatalogProductView {
 interface BestSellerProductStat {
   productId: string;
   totalSold: number;
+}
+
+interface PaymentOwnershipView {
+  orderId: string;
+  customerId: string;
+}
+
+interface ShipmentOwnershipView {
+  orderId: string;
+  customerId: string;
 }
 
 @Controller()
@@ -729,11 +741,14 @@ export class GatewayController implements OnModuleInit {
     );
   }
 
+  @UseGuards(AuthGuard)
   @Get('payments/:orderId')
-  getPaymentByOrder(@Param('orderId') orderId: string) {
-    return firstValueFrom(
-      this.paymentsClient.send('payments.get_by_order', { orderId }),
-    );
+  async getPaymentByOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId') orderId: string,
+  ) {
+    const user = this.requireAuthenticatedUser(request);
+    return this.getPaymentForUser(user, orderId);
   }
 
   @UseGuards(AuthGuard)
@@ -743,9 +758,7 @@ export class GatewayController implements OnModuleInit {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; phone?: string },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
@@ -755,10 +768,12 @@ export class GatewayController implements OnModuleInit {
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.start_yape:${body.orderId}`,
       routeScope: 'POST:/payments/yape/start',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
-      handler: () =>
-        firstValueFrom(this.paymentsClient.send('payments.start_yape', payload)),
+      handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
+        return firstValueFrom(this.paymentsClient.send('payments.start_yape', payload));
+      },
     });
   }
 
@@ -769,9 +784,7 @@ export class GatewayController implements OnModuleInit {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; operationCode: string },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
@@ -781,10 +794,12 @@ export class GatewayController implements OnModuleInit {
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.confirm_yape:${body.orderId}`,
       routeScope: 'POST:/payments/yape/confirm',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
-      handler: () =>
-        firstValueFrom(this.paymentsClient.send('payments.confirm_yape', payload)),
+      handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
+        return firstValueFrom(this.paymentsClient.send('payments.confirm_yape', payload));
+      },
     });
   }
 
@@ -795,26 +810,25 @@ export class GatewayController implements OnModuleInit {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; phone?: string },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
       phone: body.phone,
-      customerId: request.user.userId,
+      customerId: user.userId,
     };
 
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.retry_yape:${body.orderId}`,
       routeScope: 'POST:/payments/yape/retry',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
       handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
         await firstValueFrom(
           this.ordersClient.send('orders.retry_payment', {
             orderId: body.orderId,
-            customerId: request.user?.userId,
+            customerId: user.userId,
           }),
         );
 
@@ -841,9 +855,7 @@ export class GatewayController implements OnModuleInit {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string; reason?: string },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
@@ -853,10 +865,12 @@ export class GatewayController implements OnModuleInit {
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.fail_yape:${body.orderId}`,
       routeScope: 'POST:/payments/yape/fail',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
-      handler: () =>
-        firstValueFrom(this.paymentsClient.send('payments.fail_yape', payload)),
+      handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
+        return firstValueFrom(this.paymentsClient.send('payments.fail_yape', payload));
+      },
     });
   }
 
@@ -867,9 +881,7 @@ export class GatewayController implements OnModuleInit {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: { orderId: string },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
@@ -878,10 +890,12 @@ export class GatewayController implements OnModuleInit {
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.expire_yape:${body.orderId}`,
       routeScope: 'POST:/payments/yape/expire',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
-      handler: () =>
-        firstValueFrom(this.paymentsClient.send('payments.expire_yape', payload)),
+      handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
+        return firstValueFrom(this.paymentsClient.send('payments.expire_yape', payload));
+      },
     });
   }
 
@@ -899,9 +913,7 @@ export class GatewayController implements OnModuleInit {
       otp?: string;
     },
   ) {
-    if (!request.user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const user = this.requireAuthenticatedUser(request);
 
     const payload = {
       orderId: body.orderId,
@@ -915,12 +927,14 @@ export class GatewayController implements OnModuleInit {
     return this.idempotencyService.execute({
       key: idempotencyKey ?? `payments.culqi_yape_charge:${body.orderId}`,
       routeScope: 'POST:/payments/culqi/yape/charge',
-      userScope: request.user.userId,
+      userScope: user.userId,
       payload,
-      handler: () =>
-        firstValueFrom(
+      handler: async () => {
+        await this.assertPaymentOwnership(user, body.orderId);
+        return firstValueFrom(
           this.paymentsClient.send('payments.create_culqi_yape_charge', payload),
-        ),
+        );
+      },
     });
   }
 
@@ -937,11 +951,14 @@ export class GatewayController implements OnModuleInit {
     );
   }
 
+  @UseGuards(AuthGuard)
   @Get('shipments/:orderId')
-  getShipmentByOrder(@Param('orderId') orderId: string) {
-    return firstValueFrom(
-      this.shippingClient.send('shipping.get_by_order', { orderId }),
-    );
+  async getShipmentByOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId') orderId: string,
+  ) {
+    const user = this.requireAuthenticatedUser(request);
+    return this.getShipmentForUser(user, orderId);
   }
 
   @UseGuards(AuthGuard)
@@ -1029,6 +1046,56 @@ export class GatewayController implements OnModuleInit {
     }
 
     return Array.from(grouped.values());
+  }
+
+  private requireAuthenticatedUser(request: AuthenticatedRequest): AuthenticatedUser {
+    if (!request.user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return request.user;
+  }
+
+  private async getPaymentForUser(user: AuthenticatedUser, orderId: string) {
+    const payment = (await firstValueFrom(
+      this.paymentsClient.send<PaymentOwnershipView | null>(
+        'payments.get_by_order',
+        { orderId },
+      ),
+    )) as PaymentOwnershipView | null;
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (user.role !== 'ADMIN' && payment.customerId !== user.userId) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    return payment;
+  }
+
+  private async getShipmentForUser(user: AuthenticatedUser, orderId: string) {
+    const shipment = (await firstValueFrom(
+      this.shippingClient.send<ShipmentOwnershipView | null>(
+        'shipping.get_by_order',
+        { orderId },
+      ),
+    )) as ShipmentOwnershipView | null;
+
+    if (!shipment) {
+      throw new NotFoundException('Shipment not found');
+    }
+
+    if (user.role !== 'ADMIN' && shipment.customerId !== user.userId) {
+      throw new NotFoundException('Shipment not found');
+    }
+
+    return shipment;
+  }
+
+  private async assertPaymentOwnership(user: AuthenticatedUser, orderId: string): Promise<void> {
+    await this.getPaymentForUser(user, orderId);
   }
 
   private buildShippingQuote(
